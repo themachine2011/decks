@@ -11,6 +11,17 @@ The true count is calculated as: running_count / decks_remaining
 """
 
 
+# ANSI color codes for visual feedback
+class Colors:
+    RED = '\033[91m'      # Hot cards (high)
+    BLUE = '\033[94m'     # Cold cards (low)
+    YELLOW = '\033[93m'   # Neutral cards
+    GREEN = '\033[92m'    # Player favorable
+    CYAN = '\033[96m'     # Information
+    BOLD = '\033[1m'
+    RESET = '\033[0m'
+
+
 class CardCounter:
     """Card counter using the Hi-Lo counting system."""
     
@@ -22,6 +33,7 @@ class CardCounter:
     }
     
     CARDS_PER_DECK = 52
+    MAX_HISTORY = 5  # Keep last 5 batches in history
     
     def __init__(self, num_decks=6):
         """Initialize the card counter.
@@ -33,6 +45,14 @@ class CardCounter:
         self.running_count = 0
         self.cards_dealt = 0
         self.total_cards = num_decks * self.CARDS_PER_DECK
+        
+        # Temperature tracking
+        self.total_hot = 0      # Total high cards dealt
+        self.total_cold = 0     # Total low cards dealt
+        self.total_neutral = 0  # Total neutral cards dealt
+        
+        # History of batches
+        self.history = []  # List of (batch_cards, hot, cold, neutral) tuples
     
     def count_card(self, card):
         """Add a card to the count.
@@ -41,7 +61,7 @@ class CardCounter:
             card: Card value (2-10, J, Q, K, A)
             
         Returns:
-            The count value for this card
+            Tuple of (count_value, temperature) where temperature is 'hot', 'cold', or 'neutral'
         """
         card = card.upper().strip()
         if card not in self.CARD_VALUES:
@@ -50,7 +70,35 @@ class CardCounter:
         count_value = self.CARD_VALUES[card]
         self.running_count += count_value
         self.cards_dealt += 1
-        return count_value
+        
+        # Determine card temperature
+        if count_value > 0:
+            temperature = 'cold'
+            self.total_cold += 1
+        elif count_value < 0:
+            temperature = 'hot'
+            self.total_hot += 1
+        else:
+            temperature = 'neutral'
+            self.total_neutral += 1
+        
+        return count_value, temperature
+    
+    def get_card_color(self, temperature):
+        """Get the color code for a card based on its temperature.
+        
+        Args:
+            temperature: 'hot', 'cold', or 'neutral'
+            
+        Returns:
+            ANSI color code
+        """
+        if temperature == 'hot':
+            return Colors.RED
+        elif temperature == 'cold':
+            return Colors.BLUE
+        else:
+            return Colors.YELLOW
     
     def get_decks_remaining(self):
         """Calculate the estimated number of decks remaining.
@@ -89,10 +137,54 @@ class CardCounter:
         else:
             return "neutral"
     
+    def add_to_history(self, batch_cards, hot_count, cold_count, neutral_count):
+        """Add a batch of cards to the history.
+        
+        Args:
+            batch_cards: List of card strings in the batch
+            hot_count: Number of hot cards in the batch
+            cold_count: Number of cold cards in the batch
+            neutral_count: Number of neutral cards in the batch
+        """
+        self.history.append({
+            'cards': batch_cards,
+            'hot': hot_count,
+            'cold': cold_count,
+            'neutral': neutral_count
+        })
+        
+        # Keep only the last MAX_HISTORY batches
+        if len(self.history) > self.MAX_HISTORY:
+            self.history.pop(0)
+    
+    def display_history(self):
+        """Display the history of card batches."""
+        if not self.history:
+            print(f"\n{Colors.CYAN}No history available yet.{Colors.RESET}\n")
+            return
+        
+        print(f"\n{Colors.BOLD}{Colors.CYAN}{'='*60}")
+        print(f"CARD BATCH HISTORY (Last {len(self.history)} batches)")
+        print(f"{'='*60}{Colors.RESET}\n")
+        
+        for i, batch in enumerate(self.history, 1):
+            cards_str = ', '.join(batch['cards'])
+            print(f"{Colors.BOLD}Batch {i}:{Colors.RESET} {cards_str}")
+            print(f"  {Colors.RED}Hot (High cards):{Colors.RESET}     {batch['hot']}")
+            print(f"  {Colors.BLUE}Cold (Low cards):{Colors.RESET}    {batch['cold']}")
+            print(f"  {Colors.YELLOW}Neutral (Mid cards):{Colors.RESET}  {batch['neutral']}")
+            print()
+        
+        print(f"{Colors.CYAN}{'='*60}{Colors.RESET}\n")
+    
     def reset(self):
         """Reset the counter to initial state."""
         self.running_count = 0
         self.cards_dealt = 0
+        self.total_hot = 0
+        self.total_cold = 0
+        self.total_neutral = 0
+        self.history = []
     
     def display_status(self):
         """Display the current counting status."""
@@ -100,29 +192,44 @@ class CardCounter:
         true_count = self.get_true_count()
         advantage = self.get_advantage()
         
-        print(f"\n{'='*50}")
-        print(f"Running Count:     {self.running_count:+d}")
-        print(f"Decks Remaining:   {decks_remaining:.1f}")
-        print(f"True Count:        {true_count:+.2f}")
-        print(f"Deck Status:       {advantage.upper()}")
-        print(f"{'='*50}\n")
+        # Determine status color
+        if advantage == "player-favorable":
+            status_color = Colors.GREEN
+        elif advantage == "dealer-favorable":
+            status_color = Colors.RED
+        else:
+            status_color = Colors.YELLOW
+        
+        print(f"\n{Colors.BOLD}{Colors.CYAN}{'='*60}")
+        print(f"DECK STATUS")
+        print(f"{'='*60}{Colors.RESET}")
+        print(f"{Colors.BOLD}Running Count:{Colors.RESET}     {self.running_count:+d}")
+        print(f"{Colors.BOLD}Decks Remaining:{Colors.RESET}   {decks_remaining:.1f}")
+        print(f"{Colors.BOLD}True Count:{Colors.RESET}        {true_count:+.2f}")
+        print(f"{Colors.BOLD}Deck Status:{Colors.RESET}       {status_color}{advantage.upper()}{Colors.RESET}")
+        print(f"\n{Colors.BOLD}CUMULATIVE CARD TOTALS:{Colors.RESET}")
+        print(f"  {Colors.RED}Hot cards (High):{Colors.RESET}     {self.total_hot}")
+        print(f"  {Colors.BLUE}Cold cards (Low):{Colors.RESET}    {self.total_cold}")
+        print(f"  {Colors.YELLOW}Neutral cards (Mid):{Colors.RESET}  {self.total_neutral}")
+        print(f"{Colors.CYAN}{'='*60}{Colors.RESET}\n")
 
 
 def main():
     """Main function to run the card counter."""
-    print("="*50)
+    print(f"{Colors.BOLD}{Colors.CYAN}{'='*60}")
     print("BLACKJACK CARD COUNTER - Hi-Lo System")
-    print("="*50)
-    print("\nCard Values:")
-    print("  Low cards (2-6):   +1")
-    print("  Neutral (7-9):      0")
-    print("  High cards (10-A): -1")
-    print("\nCommands:")
+    print(f"{'='*60}{Colors.RESET}")
+    print(f"\n{Colors.BOLD}Card Values:{Colors.RESET}")
+    print(f"  {Colors.BLUE}Cold cards (2-6):{Colors.RESET}   +1 (Low cards)")
+    print(f"  {Colors.YELLOW}Neutral (7-9):{Colors.RESET}      0 (Mid cards)")
+    print(f"  {Colors.RED}Hot cards (10-A):{Colors.RESET}  -1 (High cards)")
+    print(f"\n{Colors.BOLD}Commands:{Colors.RESET}")
     print("  Enter card values (e.g., 2, K, 10, A)")
-    print("  'reset' - Reset the count")
     print("  'status' - Show current status")
+    print("  'history' - Show card batch history")
+    print("  'reset' - Reset the count")
     print("  'quit' or 'exit' - Exit program")
-    print("="*50)
+    print(f"{Colors.CYAN}{'='*60}{Colors.RESET}")
     
     # Ask for number of decks
     while True:
@@ -152,34 +259,65 @@ def main():
             # Check for commands
             command = user_input.lower()
             if command in ['quit', 'exit', 'q']:
-                print("\nThank you for using the Card Counter!")
+                print(f"\n{Colors.CYAN}Thank you for using the Card Counter!{Colors.RESET}")
                 break
             elif command == 'reset':
                 counter.reset()
-                print("\n*** Counter reset ***")
+                print(f"\n{Colors.YELLOW}*** Counter reset ***{Colors.RESET}")
                 counter.display_status()
                 continue
             elif command == 'status':
                 counter.display_status()
                 continue
+            elif command == 'history':
+                counter.display_history()
+                continue
             
             # Process cards (can be space or comma separated)
             cards = user_input.replace(',', ' ').split()
             
+            # Track temperature for this batch
+            batch_hot = 0
+            batch_cold = 0
+            batch_neutral = 0
+            valid_cards = []
+            
+            print()  # Add spacing
             for card in cards:
                 try:
-                    count_value = counter.count_card(card)
-                    print(f"  {card.upper()}: {count_value:+d}")
+                    count_value, temperature = counter.count_card(card)
+                    color = counter.get_card_color(temperature)
+                    print(f"  {color}{card.upper()}: {count_value:+d} ({temperature}){Colors.RESET}")
+                    
+                    # Track batch statistics
+                    if temperature == 'hot':
+                        batch_hot += 1
+                    elif temperature == 'cold':
+                        batch_cold += 1
+                    else:
+                        batch_neutral += 1
+                    
+                    valid_cards.append(card.upper())
                 except ValueError as e:
-                    print(f"  Error: {e}")
+                    print(f"  {Colors.RED}Error: {e}{Colors.RESET}")
+            
+            # Display batch temperature summary
+            if valid_cards:
+                print(f"\n{Colors.BOLD}Batch Temperature Summary:{Colors.RESET}")
+                print(f"  {Colors.RED}Hot (High):{Colors.RESET}     {batch_hot}")
+                print(f"  {Colors.BLUE}Cold (Low):{Colors.RESET}    {batch_cold}")
+                print(f"  {Colors.YELLOW}Neutral (Mid):{Colors.RESET}  {batch_neutral}")
+                
+                # Add to history
+                counter.add_to_history(valid_cards, batch_hot, batch_cold, batch_neutral)
             
             counter.display_status()
             
         except KeyboardInterrupt:
-            print("\n\nThank you for using the Card Counter!")
+            print(f"\n\n{Colors.CYAN}Thank you for using the Card Counter!{Colors.RESET}")
             break
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"{Colors.RED}Error: {e}{Colors.RESET}")
 
 
 if __name__ == "__main__":
