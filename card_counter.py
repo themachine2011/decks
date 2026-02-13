@@ -61,7 +61,12 @@ class CardCounter:
             card: Card value (2-10, J, Q, K, A)
             
         Returns:
-            Tuple of (count_value, temperature) where temperature is 'hot', 'cold', or 'neutral'
+            Tuple of (count_value, temperature) where temperature is:
+            - 'hot': High cards (10-A) with -1 value
+            - 'cold': Low cards (2-6) with +1 value
+            - 'neutral': Mid cards (7-9) with 0 value
+            
+        Note: Temperature describes cards dealt (removed from deck).
         """
         card = card.upper().strip()
         if card not in self.CARD_VALUES:
@@ -71,7 +76,10 @@ class CardCounter:
         self.running_count += count_value
         self.cards_dealt += 1
         
-        # Determine card temperature
+        # Determine card temperature based on Hi-Lo value
+        # 'cold' = low cards (2-6) that add +1 to count
+        # 'hot' = high cards (10-A) that subtract -1 from count
+        # 'neutral' = mid cards (7-9) with 0 effect
         if count_value > 0:
             temperature = 'cold'
             self.total_cold += 1

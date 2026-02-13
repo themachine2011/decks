@@ -157,10 +157,12 @@ The Hi-Lo card counting system assigns values to cards:
 
 ### Temperature Classification
 
-Each card is classified by "temperature":
-- **Cold cards** (+1 value): Low cards that favor the dealer when remaining in the deck
-- **Hot cards** (-1 value): High cards that favor the player when remaining in the deck
-- **Neutral cards** (0 value): Mid-range cards with no significant advantage
+Each card dealt is classified by "temperature" based on its Hi-Lo value:
+- **Cold cards** (2-6): Cards with +1 value - called "cold" because dealing them removes cards that increase the count
+- **Hot cards** (10-A): Cards with -1 value - called "hot" because dealing them removes high-value cards from the deck
+- **Neutral cards** (7-9): Cards with 0 value - no impact on the count
+
+**Important**: The temperature describes the cards *dealt* (removed from the deck). When many cold cards are dealt, the remaining deck becomes richer in high cards (player-favorable). When many hot cards are dealt, the remaining deck becomes richer in low cards (dealer-favorable).
 
 ### Counting Process
 
