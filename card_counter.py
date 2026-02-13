@@ -34,7 +34,7 @@ class CardCounter:
     
     CARDS_PER_DECK = 52
     MAX_HISTORY = 5  # Keep last 5 batches in history
-    COLD_CARDS_THRESHOLD = 60  # Threshold for player-favorable game
+    COLD_CARDS_THRESHOLD = 60  # Threshold of low cards (2-6) dealt for player-favorable game
     
     def __init__(self, num_decks=6):
         """Initialize the card counter.
@@ -132,6 +132,14 @@ class CardCounter:
             return 0
         return self.running_count / decks_remaining
     
+    def is_60_card_favorable(self):
+        """Check if the game is favorable due to 60+ cold cards dealt.
+        
+        Returns:
+            True if 60 or more cold cards (low cards 2-6) have been dealt
+        """
+        return self.total_cold >= self.COLD_CARDS_THRESHOLD
+    
     def get_advantage(self):
         """Determine if the deck is player-favorable or dealer-favorable.
         
@@ -139,7 +147,7 @@ class CardCounter:
             String indicating advantage status
         """
         # Check if 60+ cold cards (low cards) have been dealt
-        if self.total_cold >= self.COLD_CARDS_THRESHOLD:
+        if self.is_60_card_favorable():
             return "player-favorable"
         
         # Otherwise, use true count logic
@@ -150,14 +158,6 @@ class CardCounter:
             return "dealer-favorable"
         else:
             return "neutral"
-    
-    def is_60_card_favorable(self):
-        """Check if the game is favorable due to 60+ cold cards dealt.
-        
-        Returns:
-            True if 60 or more cold cards have been dealt
-        """
-        return self.total_cold >= self.COLD_CARDS_THRESHOLD
     
     def add_to_history(self, batch_cards, hot_count, cold_count, neutral_count):
         """Add a batch of cards to the history.
