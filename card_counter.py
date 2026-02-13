@@ -34,6 +34,7 @@ class CardCounter:
     
     CARDS_PER_DECK = 52
     MAX_HISTORY = 5  # Keep last 5 batches in history
+    COLD_CARDS_THRESHOLD = 60  # Threshold for player-favorable game
     
     def __init__(self, num_decks=6):
         """Initialize the card counter.
@@ -137,6 +138,11 @@ class CardCounter:
         Returns:
             String indicating advantage status
         """
+        # Check if 60+ cold cards (low cards) have been dealt
+        if self.total_cold >= self.COLD_CARDS_THRESHOLD:
+            return "player-favorable"
+        
+        # Otherwise, use true count logic
         true_count = self.get_true_count()
         if true_count > 1:
             return "player-favorable"
@@ -144,6 +150,14 @@ class CardCounter:
             return "dealer-favorable"
         else:
             return "neutral"
+    
+    def is_60_card_favorable(self):
+        """Check if the game is favorable due to 60+ cold cards dealt.
+        
+        Returns:
+            True if 60 or more cold cards have been dealt
+        """
+        return self.total_cold >= self.COLD_CARDS_THRESHOLD
     
     def add_to_history(self, batch_cards, hot_count, cold_count, neutral_count):
         """Add a batch of cards to the history.
@@ -215,6 +229,11 @@ class CardCounter:
         print(f"{Colors.BOLD}Decks Remaining:{Colors.RESET}   {decks_remaining:.1f}")
         print(f"{Colors.BOLD}True Count:{Colors.RESET}        {true_count:+.2f}")
         print(f"{Colors.BOLD}Deck Status:{Colors.RESET}       {status_color}{advantage.upper()}{Colors.RESET}")
+        
+        # Special message when 60+ cold cards have been dealt
+        if self.is_60_card_favorable():
+            print(f"\n{Colors.BOLD}{Colors.GREEN}🎯 Jogo favorável ao jogador! (60+ cartas baixas saíram){Colors.RESET}")
+        
         print(f"\n{Colors.BOLD}CUMULATIVE CARD TOTALS:{Colors.RESET}")
         print(f"  {Colors.RED}Hot cards (High):{Colors.RESET}     {self.total_hot}")
         print(f"  {Colors.BLUE}Cold cards (Low):{Colors.RESET}    {self.total_cold}")

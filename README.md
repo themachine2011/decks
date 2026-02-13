@@ -5,6 +5,7 @@ A command-line card-counting system for blackjack using the Hi-Lo counting strat
 ## Features
 
 - **Hi-Lo Counting System**: Standard card counting where low cards (2-6) add +1, high cards (10-A) subtract -1, and neutral cards (7-9) have no effect
+- **60-Card Rule**: The game automatically becomes player-favorable when 60 or more low cards (2-6) have been dealt, indicating the remaining deck is rich in high cards
 - **Color-Coded Display**: Visual feedback with colors for different card types:
   - 🔵 Blue for "cold" cards (low cards: 2-6)
   - 🔴 Red for "hot" cards (high cards: 10-A)
@@ -174,9 +175,18 @@ As cards are dealt:
 5. The **decks remaining** is estimated based on cards dealt
 6. The **true count** is calculated: running count ÷ decks remaining
 7. The **deck status** indicates advantage:
+   - **60+ Cold Cards Rule**: When 60 or more low cards (2-6) have been dealt, the game automatically becomes player-favorable (🎯 special indicator appears)
    - True count > +1: Player-favorable (more high cards remaining)
    - True count < -1: Dealer-favorable (more low cards remaining)
    - Otherwise: Neutral
+
+### 60-Card Favorable Rule
+
+A key feature of this system is the **60-card threshold**: when 60 or more cold cards (low cards: 2-6) have been dealt, the system automatically marks the game as **player-favorable**. This is because:
+- With 60+ low cards removed from the deck, the remaining shoe is significantly richer in high cards (10, J, Q, K, A)
+- High cards favor the player in blackjack by increasing the chances of naturals and strong hands
+- The system displays a special message: **"🎯 Jogo favorável ao jogador! (60+ cartas baixas saíram)"**
+- This rule takes precedence over the true count calculation
 
 ### History Feature
 
