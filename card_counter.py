@@ -60,8 +60,9 @@ class CardCounter:
         """
         cards_remaining = self.total_cards - self.cards_dealt
         decks_remaining = cards_remaining / self.CARDS_PER_DECK
-        # Round to nearest 0.5 deck
-        return round(decks_remaining * 2) / 2
+        # Round to nearest 0.5 deck, with minimum of 0.5 to prevent extreme values
+        rounded = round(decks_remaining * 2) / 2
+        return max(0.5, rounded)
     
     def get_true_count(self):
         """Calculate the true count.
