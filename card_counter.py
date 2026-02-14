@@ -39,12 +39,8 @@ class CardCounter:
     MAX_HISTORY = 5  # Keep last 5 batches in history
     COLD_CARDS_THRESHOLD = 60  # Threshold of low cards (2-6) dealt for player-favorable game
     
-    def __init__(self, num_decks=8):
-        """Initialize the card counter.
-        
-        Args:
-            num_decks: Number of decks in the shoe (fixed at 8 for real shoe validation)
-        """
+    def __init__(self):
+        """Initialize the card counter for an 8-deck shoe."""
         self.num_decks = 8  # Fixed at 8 decks for per-rank validation
         self.running_count = 0
         self.cards_dealt = 0
@@ -253,6 +249,10 @@ class CardCounter:
         print(f"\n{Colors.BOLD}{Colors.CYAN}{'='*60}")
         print(f"CARD COMPOSITION (Per-Rank Counts)")
         print(f"{'='*60}{Colors.RESET}\n")
+        
+        if self.max_per_rank == 0:
+            print(f"{Colors.RED}Error: Invalid configuration{Colors.RESET}\n")
+            return
         
         for rank in self.ALL_RANKS:
             count = self.rank_counts[rank]
