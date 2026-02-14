@@ -32,34 +32,82 @@ class CardCounter:
         '10': -1, 'J': -1, 'Q': -1, 'K': -1, 'A': -1
     }
     
+    # All ranks in the shoe
+    ALL_RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+    
     CARDS_PER_DECK = 52
     MAX_HISTORY = 5  # Keep last 5 batches in history
     COLD_CARDS_THRESHOLD = 60  # Threshold of low cards (2-6) dealt for player-favorable game
     
-    def __init__(self, num_decks=6):
+    def __init__(self, num_decks=8):
         """Initialize the card counter.
         
         Args:
-            num_decks: Number of decks in the shoe (default: 6)
+            num_decks: Number of decks in the shoe (fixed at 8 for real shoe validation)
         """
-        self.num_decks = num_decks
+        self.num_decks = 8  # Fixed at 8 decks for per-rank validation
         self.running_count = 0
         self.cards_dealt = 0
-        self.total_cards = num_decks * self.CARDS_PER_DECK
+        self.total_cards = self.num_decks * self.CARDS_PER_DECK  # 416 cards
+        self.max_per_rank = 4 * self.num_decks  # 32 cards per rank in 8 decks
         
         # Temperature tracking
         self.total_hot = 0      # Total high cards dealt
         self.total_cold = 0     # Total low cards dealt
         self.total_neutral = 0  # Total neutral cards dealt
         
+        # Per-rank tracking for real shoe validation
+        self.rank_counts = {rank: 0 for rank in self.ALL_RANKS}
+        
         # History of batches
         self.history = []  # List of (batch_cards, hot, cold, neutral) tuples
+    
+    def normalize_card(self, card):
+        """Normalize card input (handle 't' -> '10', case, whitespace).
+        
+        Args:
+            card: Raw card input string
+            
+        Returns:
+            Normalized card string
+        """
+        card = card.upper().strip()
+        # Handle 't' or 'T' as '10'
+        if card == 'T':
+            card = '10'
+        return card
+    
+    def validate_batch(self, cards):
+        """Validate that a batch of cards doesn't exceed per-rank limits.
+        
+        Args:
+            cards: List of card strings to validate
+            
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        # Count cards in this batch by rank
+        batch_counts = {rank: 0 for rank in self.ALL_RANKS}
+        
+        for card in cards:
+            normalized = self.normalize_card(card)
+            if normalized not in self.CARD_VALUES:
+                return False, f"Invalid card: {card}"
+            batch_counts[normalized] += 1
+        
+        # Check if applying this batch would exceed any rank limits
+        for rank in self.ALL_RANKS:
+            new_count = self.rank_counts[rank] + batch_counts[rank]
+            if new_count > self.max_per_rank:
+                return False, f"would exceed max for {rank} (attempted {new_count}/{self.max_per_rank})"
+        
+        return True, None
     
     def count_card(self, card):
         """Add a card to the count.
         
         Args:
-            card: Card value (2-10, J, Q, K, A)
+            card: Card value (2-10, J, Q, K, A, or T for 10)
             
         Returns:
             Tuple of (count_value, temperature) where temperature is:
@@ -69,13 +117,16 @@ class CardCounter:
             
         Note: Temperature describes cards dealt (removed from deck).
         """
-        card = card.upper().strip()
+        card = self.normalize_card(card)
         if card not in self.CARD_VALUES:
             raise ValueError(f"Invalid card: {card}")
         
         count_value = self.CARD_VALUES[card]
         self.running_count += count_value
         self.cards_dealt += 1
+        
+        # Update per-rank count
+        self.rank_counts[card] += 1
         
         # Determine card temperature based on Hi-Lo value
         # 'cold' = low cards (2-6) that add +1 to count
@@ -128,8 +179,6 @@ class CardCounter:
             True count (running count adjusted for remaining decks)
         """
         decks_remaining = self.get_decks_remaining()
-        if decks_remaining <= 0:
-            return 0
         return self.running_count / decks_remaining
     
     def is_60_card_favorable(self):
@@ -199,6 +248,32 @@ class CardCounter:
         
         print(f"{Colors.CYAN}{'='*60}{Colors.RESET}\n")
     
+    def display_composition(self):
+        """Display the current per-rank card counts."""
+        print(f"\n{Colors.BOLD}{Colors.CYAN}{'='*60}")
+        print(f"CARD COMPOSITION (Per-Rank Counts)")
+        print(f"{'='*60}{Colors.RESET}\n")
+        
+        for rank in self.ALL_RANKS:
+            count = self.rank_counts[rank]
+            remaining = self.max_per_rank - count
+            bar_length = int((count / self.max_per_rank) * 20)
+            bar = '█' * bar_length + '░' * (20 - bar_length)
+            
+            # Color based on how many dealt
+            if count == 0:
+                color = Colors.RESET
+            elif count < self.max_per_rank // 2:
+                color = Colors.GREEN
+            elif count < self.max_per_rank:
+                color = Colors.YELLOW
+            else:
+                color = Colors.RED
+            
+            print(f"  {color}{rank:>2}: {count:2}/{self.max_per_rank} {bar} ({remaining} remaining){Colors.RESET}")
+        
+        print(f"\n{Colors.CYAN}{'='*60}{Colors.RESET}\n")
+    
     def reset(self):
         """Reset the counter to initial state."""
         self.running_count = 0
@@ -206,6 +281,7 @@ class CardCounter:
         self.total_hot = 0
         self.total_cold = 0
         self.total_neutral = 0
+        self.rank_counts = {rank: 0 for rank in self.ALL_RANKS}
         self.history = []
     
     def display_status(self):
@@ -232,7 +308,7 @@ class CardCounter:
         
         # Special message when 60+ cold cards have been dealt
         if self.is_60_card_favorable():
-            print(f"\n{Colors.BOLD}{Colors.GREEN}🎯 Jogo favorável ao jogador! (60+ cartas baixas saíram){Colors.RESET}")
+            print(f"\n{Colors.BOLD}{Colors.GREEN}*** Jogo favoravel ao jogador! (60+ cartas baixas sairam) ***{Colors.RESET}")
         
         print(f"\n{Colors.BOLD}CUMULATIVE CARD TOTALS:{Colors.RESET}")
         print(f"  {Colors.RED}Hot cards (High):{Colors.RESET}     {self.total_hot}")
@@ -244,36 +320,23 @@ class CardCounter:
 def main():
     """Main function to run the card counter."""
     print(f"{Colors.BOLD}{Colors.CYAN}{'='*60}")
-    print("BLACKJACK CARD COUNTER - Hi-Lo System")
+    print("BLACKJACK CARD COUNTER - Hi-Lo System (8-Deck Shoe)")
     print(f"{'='*60}{Colors.RESET}")
     print(f"\n{Colors.BOLD}Card Values:{Colors.RESET}")
     print(f"  {Colors.BLUE}Cold cards (2-6):{Colors.RESET}   +1 (Low cards)")
     print(f"  {Colors.YELLOW}Neutral (7-9):{Colors.RESET}      0 (Mid cards)")
     print(f"  {Colors.RED}Hot cards (10-A):{Colors.RESET}  -1 (High cards)")
     print(f"\n{Colors.BOLD}Commands:{Colors.RESET}")
-    print("  Enter card values (e.g., 2, K, 10, A)")
+    print("  Enter card values (e.g., 2, K, 10, A, or T for 10)")
     print("  'status' - Show current status")
     print("  'history' - Show card batch history")
+    print("  'composition' - Show per-rank card counts")
     print("  'reset' - Reset the count")
     print("  'quit' or 'exit' - Exit program")
+    print(f"\n{Colors.BOLD}Note:{Colors.RESET} 8-deck shoe (416 cards), max 32 per rank")
     print(f"{Colors.CYAN}{'='*60}{Colors.RESET}")
     
-    # Ask for number of decks
-    while True:
-        try:
-            num_decks = input("\nHow many decks in the shoe? (default: 6): ").strip()
-            if not num_decks:
-                num_decks = 6
-            else:
-                num_decks = int(num_decks)
-            if num_decks < 1 or num_decks > 8:
-                print("Please enter a number between 1 and 8.")
-                continue
-            break
-        except ValueError:
-            print("Please enter a valid number.")
-    
-    counter = CardCounter(num_decks)
+    counter = CardCounter()
     counter.display_status()
     
     while True:
@@ -285,7 +348,7 @@ def main():
             
             # Check for commands
             command = user_input.lower()
-            if command in ['quit', 'exit', 'q']:
+            if command in ['quit', 'exit']:
                 print(f"\n{Colors.CYAN}Thank you for using the Card Counter!{Colors.RESET}")
                 break
             elif command == 'reset':
@@ -299,9 +362,18 @@ def main():
             elif command == 'history':
                 counter.display_history()
                 continue
+            elif command in ['composition', 'counts']:
+                counter.display_composition()
+                continue
             
             # Process cards (can be space or comma separated)
             cards = user_input.replace(',', ' ').split()
+            
+            # Validate batch before applying
+            is_valid, error_msg = counter.validate_batch(cards)
+            if not is_valid:
+                print(f"\n{Colors.RED}Invalid input: {error_msg}. Batch ignored.{Colors.RESET}\n")
+                continue
             
             # Track temperature for this batch
             batch_hot = 0
@@ -314,7 +386,8 @@ def main():
                 try:
                     count_value, temperature = counter.count_card(card)
                     color = counter.get_card_color(temperature)
-                    print(f"  {color}{card.upper()}: {count_value:+d} ({temperature}){Colors.RESET}")
+                    normalized = counter.normalize_card(card)
+                    print(f"  {color}{normalized}: {count_value:+d} ({temperature}){Colors.RESET}")
                     
                     # Track batch statistics
                     if temperature == 'hot':
@@ -324,7 +397,7 @@ def main():
                     else:
                         batch_neutral += 1
                     
-                    valid_cards.append(card.upper())
+                    valid_cards.append(normalized)
                 except ValueError as e:
                     print(f"  {Colors.RED}Error: {e}{Colors.RESET}")
             
@@ -343,8 +416,6 @@ def main():
         except KeyboardInterrupt:
             print(f"\n\n{Colors.CYAN}Thank you for using the Card Counter!{Colors.RESET}")
             break
-        except Exception as e:
-            print(f"{Colors.RED}Error: {e}{Colors.RESET}")
 
 
 if __name__ == "__main__":
